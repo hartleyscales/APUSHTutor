@@ -76,7 +76,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 });
 
 // Start server
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Proxy listening at http://localhost:${PORT}`);
 });

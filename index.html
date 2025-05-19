@@ -1,0 +1,131 @@
+<!--
+  APUSH AI Chat Interface – white theme, balanced side margins, right‑aligned user bubbles
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APUSH Tutor — Chat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Three‑dot loader */
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0; }
+      40% { opacity: 1; }
+    }
+
+    .dot {
+      display: inline-block;
+      font-size: 0.75rem;
+      margin: 0 2px;
+      color: #4B5563; /* matches Tailwind's gray-600 */
+    }
+
+    .dot:nth-child(1) {
+      animation: blink 1.4s infinite 0s;
+    }
+    .dot:nth-child(2) {
+      animation: blink 1.4s infinite 0.2s;
+    }
+    .dot:nth-child(3) {
+      animation: blink 1.4s infinite 0.4s;
+    }
+  </style>
+</head>
+<body class="bg-white flex flex-col h-screen">
+  <!-- Center wrapper with moderate margins -->
+  <div class="max-w-4xl w-full mx-auto flex flex-col h-full">
+    <header class="backdrop-blur bg-white/80 border-b py-3 px-6 shadow-sm">
+      <h1 class="text-xl font-semibold text-gray-900">APUSH AI Tutor</h1>
+    </header>
+
+    <!-- Chat window -->
+    <main id="chat" class="flex-1 overflow-y-auto p-6 space-y-4"></main>
+
+    <!-- Input bar -->
+    <form id="chat-form" class="bg-white/95 backdrop-blur border-t p-4 flex gap-3">
+      <label for="image-input" class="flex items-center px-3 py-2 rounded-full bg-gray-200 cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <input id="image-input" type="file" accept="image/*" class="hidden" />
+      </label>
+      <input id="user-input"
+             class="flex-1 border rounded-full px-4 py-2 shadow-inner focus:outline-none focus:ring"
+             type="text" placeholder="Ask anything about APUSH…" required />
+      <button class="px-5 py-2 rounded-full bg-indigo-600 text-white shadow disabled:opacity-40"
+              id="send-btn">Send</button>
+    </form>
+  </div>
+
+  <script>
+    // Maintain full chat history
+    let messages = [];
+    const chatEl = document.getElementById('chat');
+    const form   = document.getElementById('chat-form');
+    const input  = document.getElementById('user-input');
+    const imageInput = document.getElementById('image-input');
+    const PROXY_URL = 'http://localhost:3001/chat';
+
+    // Helper to add a chat bubble
+    function addBubble(content, role, isLoader=false) {
+      const wrap = document.createElement('div');
+      wrap.className = `flex ${role==='user' ? 'justify-end' : 'justify-start'}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-2 shadow-lg text-sm leading-relaxed ${role==='user' ? 'bg-indigo-100' : 'bg-gray-100'}`;
+      if (isLoader) {
+        bubble.innerHTML = '<span class="dot">●</span><span class="dot">●</span><span class="dot">●</span>';
+      } else {
+        bubble.textContent = content;
+      }
+      wrap.appendChild(bubble);
+      chatEl.appendChild(wrap);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return bubble; // in case we need to remove loader
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text && imageInput.files.length === 0) return;
+      // user bubble for text only
+      if (text) {
+        addBubble(text, 'user');
+        messages.push({ role: 'user', content: text });
+      }
+      input.value = '';
+      input.disabled = true;
+      imageInput.value = null;
+
+      // loader bubble
+      const loaderBubble = addBubble('', 'assistant', true);
+
+      try {
+        const formData = new FormData();
+        formData.append('messages', JSON.stringify(messages));
+        if (imageInput.files[0]) {
+          formData.append('image', imageInput.files[0]);
+        }
+        const res = await fetch(PROXY_URL, {
+          method: 'POST',
+          body: formData
+        });
+        if (!res.ok) throw new Error(`Proxy error ${res.status}`);
+        const data = await res.json();
+        loaderBubble.parentNode.remove();
+        const reply = data.reply?.trim() || 'No response from assistant.';
+        addBubble(reply, 'assistant');
+        messages.push({ role: 'assistant', content: reply });
+      } catch (err) {
+        console.error(err);
+        loaderBubble.textContent = 'Error contacting tutor.';
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>
